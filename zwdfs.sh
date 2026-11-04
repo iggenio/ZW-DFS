@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# ZW-DFS for Asuswrt-Merlin - version 1.0.0
+# ZW-DFS for Asuswrt-Merlin - version 1.0.3
 # 5 GHz starts on the saved non-DFS channel (e.g. 48); after a background radar check (CAC)
 # it moves to the chosen DFS channel (e.g. 64) without disconnecting clients (wl dfs_ap_move).
 # If radar blocks the target, it tries the fallback DFS channels and retries the target later.
@@ -26,7 +26,7 @@
 
 . /usr/sbin/helper.sh
 
-VERSION=1.0.0
+VERSION=1.0.3
 ADDIR=/jffs/addons/zwdfs
 PAGE=$ADDIR/zwdfs.asp
 SELF=$ADDIR/zwdfs.sh
@@ -58,6 +58,14 @@ lm_get() { grep "^$1=" "$LASTMOVE" 2>/dev/null | head -1 | cut -d= -f2-; }
 set_phase() { echo "$1" > "$PHASE"; write_status; }
 # state of the background radar sub-radio (@1): IDLE, CAC, ...
 bg_state() { wl -i $IF dfs_ap_move 2>/dev/null | sed -n 's/^@1: state: \([^,]*\),.*/\1/p' | head -1; }
+# overall state of the DFS AP move ("IDLE" when nothing is in progress)
+mv_state() { wl -i $IF dfs_ap_move 2>/dev/null | sed -n 's/^dfs AP move in \(.*\) state.*/\1/p' | head -1; }
+# true while a background DFS check or move is in progress
+dfs_busy() {
+	m=$(mv_state); b=$(bg_state)
+	[ -n "$m" ] && [ "$m" != "IDLE" ] && return 0
+	case "$b" in ""|IDLE) return 1 ;; *) return 0 ;; esac
+}
 
 default_fallback() {
 	p=${1%%/*}
@@ -102,28 +110,41 @@ write_status() {
 try_move() {
 	c=$1
 	r0=$(radar_count)
+	# a previous background check may still be running: wait for it (max 10 min)
+	n=0
+	while dfs_busy && [ $n -lt 60 ]; do sleep 10; n=$((n+1)); done
+	[ "$(chan $IF)" = "$c" ] && return 0
 	if ! wl -i $IF dfs_ap_move "$c" >/dev/null 2>&1; then
-		log "driver refused background DFS move to $c"; return 1
+		sleep 15
+		if ! wl -i $IF dfs_ap_move "$c" >/dev/null 2>&1; then
+			log "driver refused background DFS move to $c (state: move=$(mv_state) bg=$(bg_state))"; return 1
+		fi
 	fi
 	log "background DFS check started on $c"
 	echo "Scanning $c (background radar check)" > "$PHASE"
-	i=0
-	while [ $i -lt 36 ]; do
+	i=0; prevsnap=""
+	while [ $i -lt 72 ]; do   # up to 12 minutes (weather-radar channels need 10)
 		sleep 10; i=$((i+1))
-		[ "$(chan $IF)" = "$c" ] && return 0
+		if [ "$(chan $IF)" = "$c" ]; then
+			log "background DFS check on $c completed, radio moved after about $((i*10)) s"
+			return 0
+		fi
+		snap="move=$(mv_state) bg=$(bg_state)"
+		[ "$snap" != "$prevsnap" ] && { log "DFS state on $c: $snap"; prevsnap=$snap; }
 		case "$(bg_state)" in
-			*CAC*|*vailability*) echo "Scanning $c (background radar check)" > "$PHASE" ;;
-			*) echo "Moving to $c" > "$PHASE" ;;
+			IDLE|"") echo "Moving to $c" > "$PHASE" ;;
+			*) echo "Scanning $c (background radar check)" > "$PHASE" ;;
 		esac
 		write_status
-		[ $i -gt 3 ] && wl -i $IF dfs_ap_move 2>/dev/null | grep -q 'IDLE' && break
+		# finished without moving (give the driver 20 s to start)
+		[ $i -ge 2 ] && ! dfs_busy && break
 	done
 	[ "$(chan $IF)" = "$c" ] && return 0
 	if [ "$(radar_count)" -gt "$r0" ]; then
 		echo "$(date '+%Y-%m-%d %H:%M:%S') radar on $c" >> "$RADARLOG"
 		log "RADAR detected on $c - channel not available, trying the next one"
 	else
-		log "move to $c did not complete (no radar reported by the driver)"
+		log "move to $c did not complete after $((i*10)) s, no radar reported (driver: $(wl -i $IF dfs_ap_move 2>/dev/null | tr '\n' ' ' | tr -s ' '))"
 	fi
 	return 1
 }
@@ -164,7 +185,7 @@ do_run() {
 		{ echo "time=$(date '+%Y-%m-%d %H:%M:%S')"; echo "from=$from"; echo "to=$from"; echo "before=$before"; echo "moved=$before"; echo "result=$result"; echo "clients="; } > "$LASTMOVE"
 		write_status; return 1
 	fi
-	[ "$to" != "$tg" ] && log "WARNING: target $tg unavailable, using fallback $to (target retried in $((RETRY_AFTER/60)) min)"
+	[ "$to" != "$tg" ] && log "WARNING: target $tg unavailable, using fallback $to (target retried later)"
 	set_phase "Checking clients"
 	sleep 10
 	after_list=$(macs $IF)
@@ -198,7 +219,7 @@ do_run() {
 			done
 		fi
 	fi
-	if [ "$to" = "$tg" ]; then result="OK"; else result="FALLBACK (radar on target)"; fi
+	if [ "$to" = "$tg" ]; then result="OK"; else result="FALLBACK (target unavailable)"; fi
 	[ $nmiss -gt 0 ] && result="$result - $nmiss client(s) did not follow"
 	{
 		echo "time=$(date '+%Y-%m-%d %H:%M:%S')"; echo "from=$from"; echo "to=$to"
@@ -209,7 +230,7 @@ do_run() {
 	write_status
 }
 
-# Periodic check (cron): refresh status and retry the target after the radar non-occupancy period
+# Periodic check (cron, every minute): refresh status and retry the target after the radar non-occupancy period
 do_check() {
 	write_status
 	[ "$(get_set zwdfs_enabled 1)" = "1" ] || return 0
@@ -217,13 +238,30 @@ do_check() {
 	tg=$(get_set zwdfs_target 64/80)
 	[ "$(chan $IF)" = "$tg" ] && return 0
 	wl -i $IF bss 2>/dev/null | grep -q up || return 0
+	dfs_busy && return 0
 	la=$(cat "$ATTEMPT" 2>/dev/null); [ -z "$la" ] && la=0
-	[ $(( $(date +%s) - la )) -ge $RETRY_AFTER ] || return 0
+	wait=600   # 10 min after a failure without radar
+	if [ -f "$RADARLOG" ]; then
+		rt=$(date -r "$RADARLOG" +%s 2>/dev/null); [ -n "$rt" ] && [ "$rt" -ge "$la" ] && wait=$RETRY_AFTER
+	fi
+	[ $(( $(date +%s) - la )) -ge $wait ] || return 0
 	log "5 GHz not on target $tg - retrying"
 	"$SELF" run now >/dev/null 2>&1 &
 }
 
+# remove WebUI pages left by previous ZW-DFS versions (am_get_webui_page matches by content,
+# so a new version would otherwise get a new userN.asp slot and the old page would stay)
+remove_old_pages() {
+	for f in /www/user/user*.asp; do
+		[ -f "$f" ] || continue
+		grep -q 'zwdfs_status.js' "$f" || continue
+		cmp -s "$f" "$PAGE" && continue
+		rm -f "$f" && log "removed old WebUI page $(basename "$f")"
+	done
+}
+
 install_page() {
+	remove_old_pages
 	am_get_webui_page "$PAGE"
 	if [ "$am_webui_page" = "none" ]; then log "no free WebUI page slot"; return 1; fi
 	cp "$PAGE" "/www/user/$am_webui_page"
@@ -242,7 +280,7 @@ install_page() {
 	[ -z "$(am_settings_get zwdfs_fallback)" ] && am_settings_set zwdfs_fallback "$(default_fallback "$(get_set zwdfs_target 64/80)")"
 	cru d zwdfs_status 2>/dev/null
 	cru d zwdfs_check 2>/dev/null
-	cru a zwdfs_check "*/5 * * * * $SELF check"
+	cru a zwdfs_check "* * * * * $SELF check"
 	log "ZW-DFS $VERSION: WebUI page installed as $am_webui_page (next to Wireless > Professional)"
 	write_status
 }

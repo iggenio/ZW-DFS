@@ -1,7 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <!--
-  ZW-DFS 1.0.0 - WebUI page
+  ZW-DFS 1.0.3 - WebUI page
   SPDX-License-Identifier: GPL-3.0-or-later
   Copyright (C) 2026 iggenio
   Developed with the assistance of Claude (Anthropic), an AI model.
@@ -18,6 +18,9 @@
 <title>ZW-DFS</title>
 <link rel="stylesheet" type="text/css" href="index_style.css">
 <link rel="stylesheet" type="text/css" href="form_style.css">
+<script language="JavaScript" type="text/javascript" src="/js/jquery.js"></script>
+<script>if (typeof window.jQuery == 'undefined') document.write('<script language="JavaScript" type="text/javascript" src="/jquery.js"><\/script>');</script>
+<script language="JavaScript" type="text/javascript" src="/js/httpApi.js"></script>
 <script language="JavaScript" type="text/javascript" src="/state.js"></script>
 <script language="JavaScript" type="text/javascript" src="/general.js"></script>
 <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
@@ -33,18 +36,18 @@
 </style>
 <script>
 var custom_settings = <% get_custom_settings(); %>;
-var thisPage = location.pathname.split('/').pop();
+var zw_thisPage = location.pathname.split('/').pop();
 
-function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function el(id){ return document.getElementById(id); }
+function zw_esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function zw_el(id){ return document.getElementById(id); }
 
-function renderStatus(){
+function zw_renderStatus(){
 	var s = window.zwdfs_status;
-	if (!s) { el('zw_time').innerHTML = 'status not available yet'; return; }
-	el('zw_time').innerHTML = esc(s.time);
-	if (s.version) el('zw_version').innerHTML = 'v' + esc(s.version);
+	if (!s) { zw_el('zw_time').innerHTML = 'status not available yet'; return; }
+	zw_el('zw_time').innerHTML = zw_esc(s.time);
+	if (s.version) zw_el('zw_version').innerHTML = 'v' + zw_esc(s.version);
 
-	el('zw_enabled_txt').innerHTML = (s.enabled == '1') ? '<span class="zw-ok">Enabled</span>' : '<span class="zw-off">Disabled</span>';
+	zw_el('zw_enabled_txt').innerHTML = (s.enabled == '1') ? '<span class="zw-ok">Enabled</span>' : '<span class="zw-off">Disabled</span>';
 
 	var onTarget = (s.current == s.target);
 	var cls, txt;
@@ -52,101 +55,105 @@ function renderStatus(){
 	else if (s.running == '1') { cls = 'zw-warn'; txt = 'move in progress'; }
 	else if (s.current == s.base) { cls = (s.enabled == '1') ? 'zw-warn' : 'zw-off'; txt = 'on start channel'; }
 	else { cls = 'zw-warn'; txt = 'on fallback channel'; }
-	el('zw_current').innerHTML = '<span class="' + cls + '">' + esc(s.current) + '</span> (' + txt + ')';
-	el('zw_base').innerHTML = esc(s.base) + ' &rarr; ' + esc(s.target) + ' <span class="zw-small">(fallback: ' + esc(s.fallback) + ')</span>';
+	zw_el('zw_current').innerHTML = '<span class="' + cls + '">' + zw_esc(s.current) + '</span> (' + txt + ')';
+	zw_el('zw_base').innerHTML = zw_esc(s.base) + ' &rarr; ' + zw_esc(s.target) + ' <span class="zw-small">(fallback: ' + zw_esc(s.fallback) + ')</span>';
 
 	var st = s.state || 'Idle';
 	var scls = (st == 'Idle') ? 'zw-ok' : 'zw-warn';
-	var mv = '<span class="' + scls + '">' + esc(st) + '</span>';
+	var mv = '<span class="' + scls + '">' + zw_esc(st) + '</span>';
 	if (s.lm_time) {
 		var r = s.lm_result || '';
 		var rcls = (r.indexOf('OK') == 0 && r.indexOf('did not follow') < 0) ? 'zw-ok' : (r.indexOf('FAILED') == 0 ? 'zw-bad' : 'zw-warn');
-		mv += '<br><span class="zw-small">Last move: ' + esc(s.lm_time) + ' &middot; ' + esc(s.lm_from) + ' &rarr; ' + esc(s.lm_to) +
-			' &middot; clients ' + esc(s.lm_moved) + '/' + esc(s.lm_before) + '</span> <span class="' + rcls + '">' + esc(r) + '</span>';
-		if (s.lm_clients) mv += '<br><span class="zw-small">' + esc(s.lm_clients).split(';').join('<br>') + '</span>';
+		mv += '<br><span class="zw-small">Last move: ' + zw_esc(s.lm_time) + ' &middot; ' + zw_esc(s.lm_from) + ' &rarr; ' + zw_esc(s.lm_to) +
+			' &middot; clients ' + zw_esc(s.lm_moved) + '/' + zw_esc(s.lm_before) + '</span> <span class="' + rcls + '">' + zw_esc(r) + '</span>';
+		if (s.lm_clients) mv += '<br><span class="zw-small">' + zw_esc(s.lm_clients).split(';').join('<br>') + '</span>';
 	}
-	el('zw_move').innerHTML = mv;
+	zw_el('zw_move').innerHTML = mv;
 
-	el('zw_radar').innerHTML = (s.radar_count == '0' || s.radar_count == '')
+	zw_el('zw_radar').innerHTML = (s.radar_count == '0' || s.radar_count == '')
 		? '<span class="zw-ok">none detected</span>'
-		: '<span class="zw-bad">' + esc(s.radar_count) + ' event(s)</span> &ndash; last: ' + esc(s.radar_last);
+		: '<span class="zw-bad">' + zw_esc(s.radar_count) + ' event(s)</span> &ndash; last: ' + zw_esc(s.radar_last);
 
-	el('zw_clients').innerHTML = '2.4 GHz: <b>' + esc(s.c24) + '</b> &nbsp; 5 GHz: <b>' + esc(s.c5) + '</b> &nbsp; 6 GHz: <b>' + esc(s.c6) + '</b>';
-	el('zw_log').innerHTML = esc(s.log).split('|').join('\n');
+	zw_el('zw_clients').innerHTML = '2.4 GHz: <b>' + zw_esc(s.c24) + '</b> &nbsp; 5 GHz: <b>' + zw_esc(s.c5) + '</b> &nbsp; 6 GHz: <b>' + zw_esc(s.c6) + '</b>';
+	zw_el('zw_log').innerHTML = zw_esc(s.log).split('|').join('\n');
 }
 
-function loadStatus(){
-	var old = el('zw_status_js');
+function zw_loadStatus(){
+	var old = zw_el('zw_status_js');
 	if (old) old.parentNode.removeChild(old);
 	var sc = document.createElement('script');
 	sc.id = 'zw_status_js';
 	sc.src = '/user/zwdfs_status.js?t=' + new Date().getTime();
-	sc.onload = renderStatus;
-	sc.onerror = function(){ el('zw_time').innerHTML = 'status file not found'; };
+	sc.onload = zw_renderStatus;
+	sc.onerror = function(){ zw_el('zw_time').innerHTML = 'status file not found'; };
 	document.getElementsByTagName('head')[0].appendChild(sc);
 }
 
-function blockOf(c){ var p = parseInt(c, 10); if (p >= 52 && p <= 64) return 'A'; if (p >= 100 && p <= 112) return 'B'; return ''; }
+function zw_blockOf(c){ var p = parseInt(c, 10); if (p >= 52 && p <= 64) return 'A'; if (p >= 100 && p <= 112) return 'B'; return ''; }
 
-function updateFallback(){
-	var tg = el('zw_target').value, fb = el('zw_fallback');
+function zw_updateFallback(){
+	var tg = zw_el('zw_target').value, fb = zw_el('zw_fallback');
 	for (var i = 0; i < fb.options.length; i++) {
 		var o = fb.options[i];
-		o.disabled = (o.value != 'none' && blockOf(o.value) == blockOf(tg));
+		o.disabled = (o.value != 'none' && zw_blockOf(o.value) == zw_blockOf(tg));
 	}
 	if (fb.selectedIndex >= 0 && fb.options[fb.selectedIndex].disabled) {
-		fb.value = (blockOf(tg) == 'A') ? '100/80' : '64/80';
+		fb.value = (zw_blockOf(tg) == 'A') ? '100/80' : '64/80';
 	}
 }
 
 function initial(){
 	show_menu();
-	document.form.current_page.value = thisPage;
-	document.form.next_page.value = thisPage;
-	el('zw_enabled').value = custom_settings.zwdfs_enabled || '1';
-	el('zw_target').value = custom_settings.zwdfs_target || '64/80';
-	el('zw_fallback').value = (custom_settings.zwdfs_fallback == null) ? '100/80' : custom_settings.zwdfs_fallback.split(' ')[0];
-	el('zw_target').onchange = updateFallback;
-	updateFallback();
-	loadStatus();
-	setInterval(loadStatus, 10000);
+	document.form.current_page.value = zw_thisPage;
+	document.form.next_page.value = zw_thisPage;
+	zw_el('zw_enabled').value = custom_settings.zwdfs_enabled || '1';
+	zw_el('zw_target').value = custom_settings.zwdfs_target || '64/80';
+	zw_el('zw_fallback').value = (custom_settings.zwdfs_fallback == null) ? '100/80' : custom_settings.zwdfs_fallback.split(' ')[0];
+	zw_el('zw_target').onchange = zw_updateFallback;
+	zw_updateFallback();
+	zw_loadStatus();
+	setInterval(zw_loadStatus, 10000);
 }
 
-function formValues(){
-	return { zwdfs_enabled: el('zw_enabled').value, zwdfs_target: el('zw_target').value, zwdfs_fallback: el('zw_fallback').value };
+function zw_formValues(){
+	return { zwdfs_enabled: zw_el('zw_enabled').value, zwdfs_target: zw_el('zw_target').value, zwdfs_fallback: zw_el('zw_fallback').value };
 }
 
-function isDirty(){
-	var f = formValues();
+function zw_isDirty(){
+	var f = zw_formValues();
 	return f.zwdfs_enabled != (custom_settings.zwdfs_enabled || '1') ||
 		f.zwdfs_target != (custom_settings.zwdfs_target || '64/80') ||
 		f.zwdfs_fallback != (custom_settings.zwdfs_fallback || '100/80');
 }
 
 // settings = object to store (null = keep the saved ones), script = rc action
-function send(settings, script){
+function zw_send(settings, script){
 	var cs = JSON.parse(JSON.stringify(custom_settings));
 	if (settings) { for (var k in settings) cs[k] = settings[k]; }
-	el('amng_custom').value = JSON.stringify(cs);
+	zw_el('amng_custom').value = JSON.stringify(cs);
 	document.form.action_script.value = script;
 	showLoading(3);
 	document.form.submit();
 	if (settings) { for (var k in settings) custom_settings[k] = settings[k]; }
-	setTimeout(loadStatus, 4000);
+	setTimeout(zw_loadStatus, 4000);
 }
 
-function doSave(){ send(formValues(), 'start_zwdfsstatus'); }
+function zw_doSave(){ zw_send(zw_formValues(), 'start_zwdfsstatus'); }
 
-function doMove(){
-	if (isDirty()) {
+function zw_doMove(){
+	if (zw_isDirty()) {
 		if (!confirm('Settings have unsaved changes. Save them and move now?')) return;
-		send(formValues(), 'restart_zwdfs');
+		zw_send(zw_formValues(), 'restart_zwdfs');
 	} else {
-		send(null, 'restart_zwdfs');
+		zw_send(null, 'restart_zwdfs');
 	}
 }
 
-function doRefresh(){ send(null, 'start_zwdfsstatus'); }
+// Refresh: reload the status file only (regenerated by the router every minute), no apply
+function zw_doRefresh(){
+	zw_el('zw_time').innerHTML = 'refreshing...';
+	zw_loadStatus();
+}
 </script>
 </head>
 <body onload="initial();" class="bg">
@@ -225,9 +232,9 @@ function doRefresh(){ send(null, 'start_zwdfsstatus'); }
 
 <div class="formfontdesc" style="margin-top:10px;text-align:right;"><span class="zw-small">ZW-DFS by iggenio &middot; developed with the assistance of Claude (Anthropic) &middot; GPL-3.0-or-later</span></div>
 <div class="apply_gen">
-<input type="button" class="button_gen" onclick="doSave();" value="Save" title="Save settings (no channel change)">
-<input type="button" class="button_gen" onclick="doMove();" value="Move now" title="Start the background DFS check and move to the target channel">
-<input type="button" class="button_gen" onclick="doRefresh();" value="Refresh" title="Regenerate and reload the status">
+<input type="button" class="button_gen" onclick="zw_doSave();" value="Save" title="Save settings (no channel change)">
+<input type="button" class="button_gen" onclick="zw_doMove();" value="Move now" title="Start the background DFS check and move to the target channel">
+<input type="button" class="button_gen" onclick="zw_doRefresh();" value="Refresh" title="Reload the status (updated by the router every minute)">
 </div>
 </td></tr>
 </table>

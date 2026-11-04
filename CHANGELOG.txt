@@ -7,6 +7,52 @@ Versions follow semantic versioning (MAJOR.MINOR.PATCH):
   PATCH - bug fixes
 
 
+[1.0.3] - 2026-11-04
+----------------------------------------------------------------
+Fixed
+- The router Reboot button (top banner) did not work on the
+  ZW-DFS page: the page did not load jQuery and httpApi.js, which
+  the ASUS banner code needs ("$ is not defined"). jQuery is
+  loaded from /js/jquery.js, with /jquery.js as fallback for
+  firmware that keeps it in the web root.
+- Updating the add-on could leave the old WebUI page in place
+  (a new userN.asp slot was used for the new version). "install"
+  now removes pages left by previous versions.
+- All page functions now use the zw_ prefix, so they cannot clash
+  with ASUS WebUI globals.
+
+
+[1.0.2] - 2026-11-04
+----------------------------------------------------------------
+Fixed
+- The Refresh button submitted the form like an apply, showing the
+  router progress bar. It now only reloads the status, with no
+  apply.
+
+Changed
+- The status is regenerated every minute (cron zwdfs_check, was
+  every 5 minutes), so Refresh always shows recent data.
+
+
+[1.0.1] - 2026-11-04
+----------------------------------------------------------------
+Fixed
+- After a router reboot the move to the target failed: a full
+  background radar check takes longer than after a recent use of
+  the channel, and the move was wrongly considered finished after
+  40 seconds. ZW-DFS now waits until the driver reports that the
+  background check is over (up to 12 minutes).
+- The fallback channel was refused by the driver because the
+  previous background check was still running. ZW-DFS now waits
+  for it to finish and retries once before giving up.
+- After a failure without radar, the periodic check retries after
+  10 minutes instead of 30 (30 minutes are kept after radar).
+
+Added
+- Log of the driver DFS state changes during the move, and the
+  full driver status when a move does not complete (diagnostics).
+
+
 [1.0.0] - 2026-11-04
 ----------------------------------------------------------------
 First release. Tested on ASUS ROG Rapture GT-AXE11000 with

@@ -1,5 +1,5 @@
 ZW-DFS - Zero-wait DFS add-on for Asuswrt-Merlin
-Version 1.0.0 - 4 November 2026
+Version 1.0.3 - 4 November 2026
 Author: iggenio
 License: GNU General Public License v3.0 or later (see LICENSE)
 Developed by iggenio with the assistance of Claude (Anthropic), an AI model.
@@ -129,7 +129,7 @@ Step 4 - Check the installation (router, SSH)
   cru l | grep zwdfs
   grep -a ' zwdfs: ' /opt/var/log/messages /tmp/syslog.log 2>/dev/null | tail -3
 
-  Expected: a "zwdfs_check" cron entry every 5 minutes and the
+  Expected: a "zwdfs_check" cron entry every minute and the
   message "WebUI page installed as userN.asp".
 
 Step 5 - Open the page
@@ -159,7 +159,7 @@ Reload the WebUI with Ctrl+F5.
 COMMANDS (router, SSH)
 ----------------------------------------------------------------
   /jffs/addons/zwdfs/zwdfs.sh run now    move to the target now
-  /jffs/addons/zwdfs/zwdfs.sh check      periodic check (cron)
+  /jffs/addons/zwdfs/zwdfs.sh check      periodic check (cron, every minute)
   /jffs/addons/zwdfs/zwdfs.sh status     regenerate the page status
   /jffs/addons/zwdfs/zwdfs.sh version    show the installed version
   /jffs/addons/zwdfs/zwdfs.sh install    (re)install the WebUI page

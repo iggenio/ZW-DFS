@@ -2,7 +2,7 @@
 
 **Zero-wait DFS for Asuswrt-Merlin.** Keep your 5 GHz network on a clean DFS channel without losing 5 GHz for a minute every time the router reboots or the Wi-Fi restarts.
 
-Version 1.0.0 · Author: iggenio · License: GPL-3.0-or-later · Tested on ASUS ROG Rapture GT-AXE11000 with Asuswrt-Merlin 3004.388.12_2
+Version 1.0.3 · Author: iggenio · License: GPL-3.0-or-later · Tested on ASUS ROG Rapture GT-AXE11000 with Asuswrt-Merlin 3004.388.12_2
 
 ---
 
@@ -33,7 +33,7 @@ ZW-DFS uses the background radar check built into recent Broadcom Wi-Fi chips (`
   - settings: enable/disable, target DFS channel, fallback DFS channel;
   - buttons: Save, Move now, Refresh;
   - recent events from the system log.
-- Periodic check every 5 minutes (cron).
+- Periodic check every minute (cron): keeps the WebUI status fresh and retries the target channel when needed.
 - No dependencies on other add-ons: works without amtm, Entware, scribe, Skynet or a USB drive.
 
 ## Requirements
@@ -102,7 +102,7 @@ See [INSTALL.txt](INSTALL.txt) for the full guide.
 | Command (router, SSH) | Description |
 |---|---|
 | `zwdfs.sh run now` | Move to the target channel now |
-| `zwdfs.sh check` | Periodic check (run by cron every 5 minutes) |
+| `zwdfs.sh check` | Periodic check (run by cron every minute) |
 | `zwdfs.sh status` | Regenerate the status shown in the WebUI |
 | `zwdfs.sh version` | Show the installed version |
 | `zwdfs.sh install` | (Re)install the WebUI page and cron job |
