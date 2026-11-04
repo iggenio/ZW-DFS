@@ -1,0 +1,47 @@
+ZW-DFS - Changelog
+================================================================
+All notable changes to ZW-DFS are listed here, newest first.
+Versions follow semantic versioning (MAJOR.MINOR.PATCH):
+  MAJOR - incompatible changes (settings, file layout, hooks)
+  MINOR - new features, backward compatible
+  PATCH - bug fixes
+
+
+[1.0.0] - 2026-11-04
+----------------------------------------------------------------
+First release. Tested on ASUS ROG Rapture GT-AXE11000 with
+Asuswrt-Merlin 3004.388.12_2. Released under GPL-3.0-or-later.
+Author: iggenio. Developed with the assistance of Claude (Anthropic).
+
+Added
+- Zero-wait DFS for the 5 GHz radio: start on the non-DFS channel
+  saved in Wireless > General, then move to the target DFS channel
+  with a background radar check (wl dfs_ap_move), without
+  disconnecting clients.
+- 90-second settle delay after the radio comes up, so clients are
+  stable on the start channel before the move.
+- Fallback DFS channel when radar blocks the target; radar events
+  are logged to radar.log and shown in the WebUI.
+- Automatic retry of the target channel after the 30-minute radar
+  non-occupancy period (cron check every 5 minutes).
+- Client tracking: clients on 5 GHz are counted before and after
+  the move; clients that fall back to 2.4 GHz are sent back to
+  5 GHz (one attempt per move) and reported by MAC and DHCP name.
+- WebUI page under Wireless > ZW-DFS (English): status with
+  synthetic move state (Idle, Waiting for clients to settle,
+  Scanning, Moving, Checking clients, Recovering clients), last
+  move summary, radar events, clients per band, recent events.
+- Settings: automation on/off, target DFS channel, fallback DFS
+  channel (channels in the target's 80 MHz block are not
+  selectable).
+- Buttons: Save, Move now, Refresh.
+- Commands: install, startup, event, run [now], check, status,
+  version, uninstall.
+- Hooks: /jffs/scripts/service-event (Wi-Fi restart and WebUI
+  actions) and /jffs/scripts/services-start (router boot).
+
+Known limitations
+- Radar detection is inferred from driver messages (dmesg); not yet
+  verified with a real radar event.
+- Requires a Broadcom driver with "wl dfs_ap_move"; other models
+  or interface names may need changes (IF=eth7 in zwdfs.sh).

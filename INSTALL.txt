@@ -1,0 +1,199 @@
+ZW-DFS - Zero-wait DFS add-on for Asuswrt-Merlin
+Version 1.0.0 - 4 November 2026
+Author: iggenio
+License: GNU General Public License v3.0 or later (see LICENSE)
+Developed by iggenio with the assistance of Claude (Anthropic), an AI model.
+================================================================
+
+IMPORTANT - PREREQUISITES
+----------------------------------------------------------------
+Read this before installing. ZW-DFS will not work unless ALL of
+the following are true:
+
+  1. Firmware: Asuswrt-Merlin (it does NOT work on the stock ASUS
+     firmware). It uses the Merlin Addons API (/usr/sbin/helper.sh,
+     custom_settings), the service-event and services-start hooks
+     and cru.
+
+  2. JFFS custom scripts enabled:
+     Administration > System > "Enable JFFS custom scripts and
+     configs" = Yes (on 3004.388.10 and later the option is in the
+     Basic Config section).
+
+  3. Wi-Fi driver with background DFS support: the Broadcom driver
+     must provide the "wl dfs_ap_move" command (background radar
+     check / zero-wait DFS).
+     Tested on: ASUS ROG Rapture GT-AXE11000, Asuswrt-Merlin
+     3004.388.12_2, 5 GHz radio on interface eth7.
+     Other models may not support it, or may use a different
+     interface name. Check first (see "Before you install").
+
+  4. SSH access to the router (LAN only is enough) and a PC with
+     an SSH/SCP client (Windows: OpenSSH in PowerShell).
+
+  5. Region and channels: the router must be set to its legal
+     region. The add-on only uses DFS channels allowed by that
+     region (for Europe: 52-64 and 100-112 at 80 MHz).
+
+Not required: amtm, Entware, scribe, Skynet, a USB drive.
+If scribe is installed, ZW-DFS reads its events from
+/opt/var/log/messages; otherwise it uses /tmp/syslog.log.
+
+
+WHAT IT DOES
+----------------------------------------------------------------
+- The 5 GHz radio starts on the channel saved in Wireless > General,
+  which should be a NON-DFS channel (e.g. 48/80): clients can
+  connect immediately after a reboot or Wi-Fi restart, with no
+  radar wait.
+- About 90 seconds later, ZW-DFS runs a background radar check on
+  the target DFS channel (e.g. 64/80) and moves the radio there
+  without disconnecting clients.
+- If radar blocks the target, it uses the fallback DFS channel
+  (e.g. 100/80), logs the radar event and retries the target after
+  30 minutes.
+- Clients that were on 5 GHz and fall back to 2.4 GHz during the
+  move are sent back to 5 GHz.
+- WebUI page: Wireless > ZW-DFS (status, settings, recent events;
+  buttons Save, Move now, Refresh).
+
+
+FILES
+----------------------------------------------------------------
+  zwdfs.sh       management script
+  zwdfs.asp      WebUI page
+  INSTALL.txt    this guide
+  CHANGELOG.txt  version history
+
+On the router both go in: /jffs/addons/zwdfs/
+Runtime files created there: lastmove.txt, radar.log, lastattempt
+
+
+BEFORE YOU INSTALL - CHECK DRIVER SUPPORT
+----------------------------------------------------------------
+On the router (SSH):
+
+  wl -i eth7 chanspec
+  wl -i eth7 dfs_ap_move
+
+The first command must print a 5 GHz channel (e.g. "48/80").
+The second must print something like:
+
+  version=1, move status=-1
+  dfs AP move in IDLE state
+
+If you get "Unsupported" or an error, the driver does not support
+background DFS and ZW-DFS cannot work on this router. If eth7 is
+not the 5 GHz radio on your model, find the right interface with
+"wl -i ethX chanspec" (X = 5, 6, 7, 8...) and change IF=eth7 at the
+top of zwdfs.sh.
+
+
+INSTALLATION
+----------------------------------------------------------------
+In the commands below replace <router-user> with your router
+login name and <router-ip> with your router LAN address.
+
+Step 1 - Save the start channel (router WebUI)
+  Wireless > General > 5 GHz > Control Channel = 48,
+  Channel bandwidth = 80 MHz > Apply.
+
+Step 2 - Copy the files (PC, PowerShell, in the folder that holds
+         the two files)
+
+  ssh <router-user>@<router-ip> "mkdir -p /jffs/addons/zwdfs"
+  scp -O zwdfs.sh zwdfs.asp <router-user>@<router-ip>:/jffs/addons/zwdfs/
+
+  Note: "-O" is required by recent OpenSSH versions (without it
+  you get "sftp-server: not found"). On older versions remove it
+  (error: "invalid option -- 'O'").
+  Run scp from the PC, NOT inside the SSH session.
+
+  The files must have Unix line endings (LF). If you edited them
+  on Windows, make sure your editor did not convert them to CRLF.
+
+Step 3 - Hooks and installation (router, SSH)
+
+  chmod +x /jffs/addons/zwdfs/zwdfs.sh
+  grep -q zwdfs /jffs/scripts/service-event || echo '/jffs/addons/zwdfs/zwdfs.sh event "$1" "$2" & # zwdfs' >> /jffs/scripts/service-event
+  grep -q zwdfs /jffs/scripts/services-start || echo '/jffs/addons/zwdfs/zwdfs.sh startup & # zwdfs' >> /jffs/scripts/services-start
+  chmod +x /jffs/scripts/service-event /jffs/scripts/services-start
+  /jffs/addons/zwdfs/zwdfs.sh install
+
+  Note: the Merlin event hook is "service-event" (singular); the
+  startup hook is "services-start" (plural). If either file did not
+  exist, add "#!/bin/sh" as its first line.
+
+Step 4 - Check the installation (router, SSH)
+
+  cru l | grep zwdfs
+  grep -a ' zwdfs: ' /opt/var/log/messages /tmp/syslog.log 2>/dev/null | tail -3
+
+  Expected: a "zwdfs_check" cron entry every 5 minutes and the
+  message "WebUI page installed as userN.asp".
+
+Step 5 - Open the page
+  Reload the router WebUI (Ctrl+F5) and open Wireless > ZW-DFS.
+  Check the settings (Automation = Enabled, Target = 64/80,
+  Fallback = 100/80) and press Save.
+
+Step 6 - Test
+  Press "Move now", or press Apply in Wireless > General.
+  Within about 3-4 minutes "Current 5 GHz channel" must turn green
+  on the target channel and "Last move" must show the same number
+  of clients before and after the move.
+  Final test: reboot the router and check the page after 4-5
+  minutes.
+
+
+HOW TO UPDATE
+----------------------------------------------------------------
+Copy the new files as in Step 2, then on the router:
+
+  chmod +x /jffs/addons/zwdfs/zwdfs.sh
+  /jffs/addons/zwdfs/zwdfs.sh install
+
+Reload the WebUI with Ctrl+F5.
+
+
+COMMANDS (router, SSH)
+----------------------------------------------------------------
+  /jffs/addons/zwdfs/zwdfs.sh run now    move to the target now
+  /jffs/addons/zwdfs/zwdfs.sh check      periodic check (cron)
+  /jffs/addons/zwdfs/zwdfs.sh status     regenerate the page status
+  /jffs/addons/zwdfs/zwdfs.sh version    show the installed version
+  /jffs/addons/zwdfs/zwdfs.sh install    (re)install the WebUI page
+  /jffs/addons/zwdfs/zwdfs.sh uninstall  remove page, cron and hooks
+  grep -a ' zwdfs: ' /opt/var/log/messages | tail
+  wl -i eth7 dfs_ap_move                 background DFS state
+
+
+UNINSTALL
+----------------------------------------------------------------
+  /jffs/addons/zwdfs/zwdfs.sh uninstall
+  rm -r /jffs/addons/zwdfs
+
+Then set the 5 GHz channel you want in Wireless > General.
+
+
+NOTES
+----------------------------------------------------------------
+- A factory reset of the router erases /jffs: reinstall the add-on.
+  A Merlin firmware update normally keeps /jffs; after an update
+  check that Wireless > ZW-DFS is still there and that
+  "wl -i eth7 dfs_ap_move" still responds.
+- Radar events are detected from the driver messages (dmesg).
+  This has not yet been verified with a real radar event.
+- Avoid channels 116-128 as target or fallback: in Europe they
+  require a 10-minute weather-radar check.
+- Settings are stored in /jffs/addons/custom_settings.txt
+  (zwdfs_enabled, zwdfs_target, zwdfs_fallback).
+
+
+AI ASSISTANCE
+----------------------------------------------------------------
+ZW-DFS was developed by iggenio with the assistance of Claude
+(Anthropic), an AI model, which contributed to the analysis, the
+code and this documentation. The author reviewed the code and
+tested it on an ASUS GT-AXE11000. Review the code before installing
+it on your own router; use it at your own risk.
