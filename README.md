@@ -68,18 +68,37 @@ If it returns `Unsupported` or an error, your router cannot run ZW-DFS. If `eth7
 
 Replace `<router-user>` and `<router-ip>` with your router login name and LAN address.
 
-**1. Set the start channel** in the router WebUI: *Wireless > General > 5 GHz*: Control Channel = **48**, Bandwidth = **80 MHz**, then Apply.
+You will use two windows on your PC:
 
-**2. Copy the files** from your PC:
+- **Router shell**: a PowerShell (or cmd) window where you have logged in to the router with `ssh <router-user>@<router-ip>`. The prompt shows the router name (e.g. `<router-user>@GT-AXE11000:/tmp/home/root#`). Commands typed here run **on the router**.
+- **PC shell**: a second PowerShell (or cmd) window that is **not** logged in to the router. Commands typed here run **on your PC**.
+
+**1. Set the start channel** — *router WebUI*: *Wireless > General > 5 GHz*: Control Channel = **48**, Bandwidth = **80 MHz**, then Apply.
+
+**2. Create the add-on folder** — *router shell*:
 
 ```sh
-ssh <router-user>@<router-ip> "mkdir -p /jffs/addons/zwdfs"
+ssh <router-user>@<router-ip>
+```
+
+then, at the router prompt:
+
+```sh
+mkdir -p /jffs/addons/zwdfs
+```
+
+Keep this window open: you will use it again in step 4.
+
+**3. Copy the files** — *PC shell* (a new window, not the SSH session), in the folder that contains `zwdfs.sh` and `zwdfs.asp`:
+
+```bat
+cd <folder-with-the-files>
 scp -O zwdfs.sh zwdfs.asp <router-user>@<router-ip>:/jffs/addons/zwdfs/
 ```
 
-> `-O` is needed by recent OpenSSH versions (otherwise: `sftp-server: not found`). Remove it on older versions (`invalid option -- 'O'`). Files must keep Unix (LF) line endings.
+> `scp` must run on the PC: inside the router session it fails because the files are not there. `-O` is needed by recent OpenSSH versions (otherwise: `sftp-server: not found`); remove it on older versions (`invalid option -- 'O'`). Files must keep Unix (LF) line endings.
 
-**3. Install** on the router (SSH):
+**4. Install** — *router shell* (the window from step 2):
 
 ```sh
 chmod +x /jffs/addons/zwdfs/zwdfs.sh
@@ -91,9 +110,9 @@ chmod +x /jffs/scripts/service-event /jffs/scripts/services-start
 
 > The event hook is `service-event` (singular); the startup hook is `services-start` (plural). If a file did not exist, add `#!/bin/sh` as its first line.
 
-**4. Open the page**: reload the WebUI (Ctrl+F5), go to *Wireless > ZW-DFS*, check the settings and press **Save**.
+**5. Open the page** — *router WebUI*: reload the WebUI (Ctrl+F5), go to *Wireless > ZW-DFS*, check the settings and press **Save**.
 
-**5. Test**: press **Move now** (or Apply in *Wireless > General*). Within 3–4 minutes the current channel turns green on the target, and the last move shows the same number of clients before and after.
+**6. Test** — *router WebUI*: press **Move now** (or Apply in *Wireless > General*). Within 3–4 minutes the current channel turns green on the target, and the last move shows the same number of clients before and after.
 
 See [INSTALL.txt](INSTALL.txt) for the full guide.
 
@@ -114,7 +133,7 @@ Settings are stored in `/jffs/addons/custom_settings.txt` (`zwdfs_enabled`, `zwd
 
 ## Updating
 
-Copy the new `zwdfs.sh` and `zwdfs.asp` as in step 2, then:
+Copy the new `zwdfs.sh` and `zwdfs.asp` from the *PC shell* as in step 3, then in the *router shell*:
 
 ```sh
 chmod +x /jffs/addons/zwdfs/zwdfs.sh

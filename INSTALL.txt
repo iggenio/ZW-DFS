@@ -94,25 +94,50 @@ INSTALLATION
 In the commands below replace <router-user> with your router
 login name and <router-ip> with your router LAN address.
 
-Step 1 - Save the start channel (router WebUI)
+Each step says WHERE to run it:
+
+  [router WebUI]  the router web page in your browser
+  [router shell]  a PowerShell/cmd window on your PC where you
+                  logged in with "ssh <router-user>@<router-ip>".
+                  The prompt shows the router name, e.g.
+                  <router-user>@GT-AXE11000:/tmp/home/root#
+                  Commands typed here run ON THE ROUTER.
+  [PC shell]      a SECOND PowerShell/cmd window that is NOT
+                  logged in to the router. Commands typed here run
+                  ON YOUR PC.
+
+Step 1 - Save the start channel [router WebUI]
   Wireless > General > 5 GHz > Control Channel = 48,
   Channel bandwidth = 80 MHz > Apply.
 
-Step 2 - Copy the files (PC, PowerShell, in the folder that holds
-         the two files)
+Step 2 - Create the add-on folder [router shell]
+  Log in to the router:
 
-  ssh <router-user>@<router-ip> "mkdir -p /jffs/addons/zwdfs"
-  scp -O zwdfs.sh zwdfs.asp <router-user>@<router-ip>:/jffs/addons/zwdfs/
+    ssh <router-user>@<router-ip>
 
-  Note: "-O" is required by recent OpenSSH versions (without it
-  you get "sftp-server: not found"). On older versions remove it
-  (error: "invalid option -- 'O'").
-  Run scp from the PC, NOT inside the SSH session.
+  then, at the router prompt:
+
+    mkdir -p /jffs/addons/zwdfs
+
+  Keep this window open: you will use it again in Step 4.
+
+Step 3 - Copy the files [PC shell]
+  Open a NEW PowerShell/cmd window (not the SSH session), go to
+  the folder that holds zwdfs.sh and zwdfs.asp, and run:
+
+    cd <folder-with-the-files>
+    scp -O zwdfs.sh zwdfs.asp <router-user>@<router-ip>:/jffs/addons/zwdfs/
+
+  Note: scp must run on the PC. Inside the router session it fails,
+  because the files are not on the router.
+  "-O" is required by recent OpenSSH versions (without it you get
+  "sftp-server: not found"). On older versions remove it (error:
+  "invalid option -- 'O'").
 
   The files must have Unix line endings (LF). If you edited them
   on Windows, make sure your editor did not convert them to CRLF.
 
-Step 3 - Hooks and installation (router, SSH)
+Step 4 - Hooks and installation [router shell, window of Step 2]
 
   chmod +x /jffs/addons/zwdfs/zwdfs.sh
   grep -q zwdfs /jffs/scripts/service-event || echo '/jffs/addons/zwdfs/zwdfs.sh event "$1" "$2" & # zwdfs' >> /jffs/scripts/service-event
@@ -124,7 +149,7 @@ Step 3 - Hooks and installation (router, SSH)
   startup hook is "services-start" (plural). If either file did not
   exist, add "#!/bin/sh" as its first line.
 
-Step 4 - Check the installation (router, SSH)
+Step 5 - Check the installation [router shell]
 
   cru l | grep zwdfs
   grep -a ' zwdfs: ' /opt/var/log/messages /tmp/syslog.log 2>/dev/null | tail -3
@@ -132,12 +157,12 @@ Step 4 - Check the installation (router, SSH)
   Expected: a "zwdfs_check" cron entry every minute and the
   message "WebUI page installed as userN.asp".
 
-Step 5 - Open the page
+Step 6 - Open the page [router WebUI]
   Reload the router WebUI (Ctrl+F5) and open Wireless > ZW-DFS.
   Check the settings (Automation = Enabled, Target = 64/80,
   Fallback = 100/80) and press Save.
 
-Step 6 - Test
+Step 7 - Test [router WebUI]
   Press "Move now", or press Apply in Wireless > General.
   Within about 3-4 minutes "Current 5 GHz channel" must turn green
   on the target channel and "Last move" must show the same number
@@ -148,7 +173,8 @@ Step 6 - Test
 
 HOW TO UPDATE
 ----------------------------------------------------------------
-Copy the new files as in Step 2, then on the router:
+Copy the new files from the [PC shell] as in Step 3, then in the
+[router shell]:
 
   chmod +x /jffs/addons/zwdfs/zwdfs.sh
   /jffs/addons/zwdfs/zwdfs.sh install
