@@ -42,6 +42,13 @@ If scribe is installed, ZW-DFS reads its events from
 
 WHAT IT DOES
 ----------------------------------------------------------------
+Why: on a DFS channel the 5 GHz radio is off for about 60 seconds
+(radar check) after every reboot or Wi-Fi restart. With Smart
+Connect (one SSID for all bands) dual-band clients join 2.4 GHz in
+that minute, and band steering only moves idle clients, so active
+ones can stay on 2.4 GHz for hours. ZW-DFS is most useful in this
+case; with separate SSIDs per band the impact is smaller.
+
 - The 5 GHz radio starts on the channel saved in Wireless > General,
   which should be a NON-DFS channel (e.g. 48/80): clients can
   connect immediately after a reboot or Wi-Fi restart, with no

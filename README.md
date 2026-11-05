@@ -1,19 +1,24 @@
 # ZW-DFS
 
-**Zero-wait DFS for Asuswrt-Merlin.** Keep your 5 GHz network on a clean DFS channel without losing 5 GHz for a minute every time the router reboots or the Wi-Fi restarts.
+**Zero-wait DFS for Asuswrt-Merlin.** Keep your 5 GHz network on a clean DFS channel without losing 5 GHz for a minute every time the router reboots or the Wi-Fi restarts, and without Smart Connect clients getting stuck on 2.4 GHz.
 
 Version 1.0.3 · Author: iggenio · License: GPL-3.0-or-later · Tested on ASUS ROG Rapture GT-AXE11000 with Asuswrt-Merlin 3004.388.12_2
 
 ---
 
-## The problem
+## The problem (especially if you use Smart Connect)
 
-DFS channels (52–64 and 100–144 in Europe) are often the cleanest 5 GHz channels, but before using one the router must listen for radar for about 60 seconds (Channel Availability Check, CAC). During that minute the 5 GHz network does not exist:
+DFS channels (52–64 and 100–144 in Europe) are often the cleanest 5 GHz channels, but before using one the router must listen for radar for about 60 seconds (Channel Availability Check, CAC). During that minute the 5 GHz radio does not transmit at all.
 
-- after every reboot or Wi-Fi restart, dual-band clients connect to 2.4 GHz instead;
-- once they are connected and active, Smart Connect band steering does not move them, so they can stay on 2.4 GHz for hours.
+With **Smart Connect** enabled this becomes a real issue, because all bands share the same SSID:
 
-The non-DFS channels (36–48 in Europe) have no radar wait, but they are usually the most crowded.
+- after every reboot or Wi-Fi restart (including every *Apply* in the Wireless settings), the SSID is visible only on 2.4 GHz (and 6 GHz, if present) for that first minute, so dual-band clients reconnect there;
+- when 5 GHz comes up, Smart Connect band steering only moves **idle** clients: phones streaming, laptops in a call, TVs, consoles and anything else with traffic stay on 2.4 GHz;
+- steering of active clients may never happen, so they can stay on the slow, crowded 2.4 GHz band for hours, until they disconnect on their own.
+
+With separate SSIDs per band the impact is smaller: a client configured only for the 5 GHz SSID simply waits and reconnects to it. With Smart Connect, the client cannot tell the bands apart, and the router does not fix the choice later.
+
+The usual workaround is a non-DFS channel (36–48 in Europe), which has no radar wait, but those channels are usually the most crowded. ZW-DFS gives you both: clients connect immediately on a non-DFS channel at boot, and the router then moves to the clean DFS channel without dropping them.
 
 ## The solution
 
