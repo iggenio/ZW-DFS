@@ -185,6 +185,12 @@ ZW-DFS is free software, released under the **GNU General Public License v3.0 or
 
 **iggenio**
 
+## Support
+
+If ZW-DFS is useful to you, you can buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/iggenio)
+
 ## AI assistance
 
 ZW-DFS was developed by iggenio with the assistance of **Claude** (Anthropic), an AI model, which contributed to the analysis, the code and the documentation. The author defined the requirements, reviewed the code and tested it on an ASUS GT-AXE11000. As with any software, review it before installing it on your own router.
